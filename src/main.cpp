@@ -41,7 +41,28 @@ void disabled() {}
 
 void competition_initialize() {}
 
-void autonomous() {}
+void autonomous() {
+    drive->setMaxVelocity(175);
+	drive->moveRaw(-550);
+	drive->setMaxVelocity(200);
+
+	drive->setTurnsMirrored(true);
+	drive->turnRaw(360);
+
+	drive->setMaxVelocity(75);
+	drive->moveRaw(-350);
+
+	pros::delay(500);
+	piston.set_value(true);
+	pros::delay(1000);
+
+	drive->setMaxVelocity(175);
+	drive->moveRawAsync(550);
+
+	intake.moveVoltage(12000);
+	pros::delay(2000);
+	intake.moveVoltage(0);
+}
 
 void opcontrol() {
 
