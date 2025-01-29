@@ -76,9 +76,11 @@ void opcontrol() {
 		                 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
 		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);  // Prints status of the emulated screen LCDs
 
+		// gathering joystick input for drive
 		leftY = controller.getAnalog(ControllerAnalog::leftY);
 		rightY = controller.getAnalog(ControllerAnalog::rightY);
 
+		// added dampened zone for more precise small movements
 		if((abs(leftY) <= 0.3) || (abs(rightY) <= 0.3)) {
 			drive->getModel()->tank(
 				leftY * 0.5,
