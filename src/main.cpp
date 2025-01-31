@@ -44,9 +44,6 @@ void competition_initialize() {}
 void autonomous() {}
 
 void opcontrol() {
-	//sets the motor(s) to use the Degrees unit
-	drive->encoderUnits{0};
-
 	bool toggle = false, latch = false;
 	float leftY, rightY;
 	Controller controller;
