@@ -35,6 +35,10 @@ std::shared_ptr<ChassisController> drive =
 
 // Device instantiation
 Motor intake(19);
+
+Motor dunkerLeft(14);
+Motor dunkerRight(15);
+
 pros::ADIDigitalOut piston('A');
 
 void disabled() {}
