@@ -16,6 +16,8 @@ void on_center_button() {
 	}
 }
 
+Motor dunker(8);
+
 void initialize() {
 	pros::lcd::initialize();
 	pros::lcd::set_text(1, "Hello PROS User!");
@@ -36,8 +38,7 @@ std::shared_ptr<ChassisController> drive =
 // Device instantiation
 Motor intake(19);
 
-Motor dunkerLeft(14);
-Motor dunkerRight(15);
+
 
 pros::ADIDigitalOut piston('A');
 
@@ -48,15 +49,24 @@ void competition_initialize() {}
 void autonomous() {}
 
 void opcontrol() {
-	bool toggle = false, latch = false;
+	bool togglePiston = false, toggleDunker = false, latchPiston = false, latchDunker = false;
 	float leftY, rightY;
+	double inactive = 0, active = 54;
 	Controller controller;
+
+	dunker.tarePosition();
 
 	while (true) {
 		// may remove this later
+		/*
 		pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
 		                 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
 		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);  // Prints status of the emulated screen LCDs
+
+		*/
+
+		pros::lcd::print(0, "%lf",dunker.getPosition());
+		pros::lcd::print(1, "%lf",dunker.getTargetPosition());
 
 		leftY = controller.getAnalog(ControllerAnalog::leftY);
 		rightY = controller.getAnalog(ControllerAnalog::rightY);
@@ -82,19 +92,41 @@ void opcontrol() {
 			intake.moveVelocity(0);
 
 		// clamp toggle
-		if (toggle)
+		if (togglePiston)
 			piston.set_value(true); // turns clamp solenoid on
 		else
 			piston.set_value(false); // turns clamp solenoid off
 
 		if (controller.getDigital(ControllerDigital::L1)) {
-			if(!latch){ // if latch is false, flip toggle one time and set latch to true
-				toggle = !toggle;
-				latch = true;
+			if(!latchPiston){ // if latch is false, flip toggle one time and set latch to true
+				togglePiston = !togglePiston;
+				latchDunker = true;
 			}
 		}
 		else
-			latch = false; //once button is released then release the latch too
+			latchPiston = false; //once button is released then release the latch too
+
+
+		//dunker
+		if(controller.getDigital(ControllerDigital::A))
+			dunker.moveVelocity(50);
+			//dunker.moveAbsolute(active, 100);
+
+		/*
+		if (toggleDunker)
+			dunker.moveAbsolute(active, 50); 
+		else
+			dunker.moveAbsolute(inactive, 50);
+
+		if (controller.getDigital(ControllerDigital::A)) {
+			if(!latchDunker){ // if latch is false, flip toggle one time and set latch to true
+				toggleDunker = !toggleDunker;
+				latchDunker = true;
+			}
+		}
+		else
+			latchDunker = false; //once button is released then release the latch too
+		*/
 
 		pros::delay(20); // Run for 20 ms then update
 	}
