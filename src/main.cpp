@@ -27,14 +27,14 @@ void initialize() {
 std::shared_ptr<ChassisController> drive = 
 	ChassisControllerBuilder()
 		.withMotors(
-			{-7, -8, -9},
-			{4, 5, 6}
+			{-21, -15, -14},
+			{13, 12, 11}
 			)
 		.withDimensions(AbstractMotor::gearset::blue, {{3.25_in, 10.5_in}, imev5BlueTPR * (600.0 / 450.0)}) // 0.75 = 8_in, 1.0 = 11.5_in, 1.333 = 14_in (SHOULD BE 0.75)
 		.build();
 
 // Device instantiation
-Motor intake(19);
+Motor intake(16);
 pros::ADIDigitalOut piston('A');
 
 void disabled() {}
