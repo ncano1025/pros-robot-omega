@@ -16,31 +16,37 @@ void on_center_button() {
 	}
 }
 
-Motor dunker(8);
+pros::Motor dunker(8);
+pros::ADIAnalogIn sensor('B');
+int initSensor;
 
 void initialize() {
 	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Hello PROS User!");
+	//pros::lcd::set_text(1, "Hello PROS User!");
 
-	pros::lcd::register_btn1_cb(on_center_button);
+	//pros::lcd::register_btn1_cb(on_center_button);
+
+	dunker.set_brake_mode(MOTOR_BRAKE_HOLD);
+
+	initSensor = sensor.get_value();
+
 }
 
 // Chassis instantiation
 std::shared_ptr<ChassisController> drive = 
 	ChassisControllerBuilder()
 		.withMotors(
-			{-7, -8, -9},
-			{4, 5, 6}
+			{-21, -15, -14},
+			{13, 12, 11}
 			)
 		.withDimensions(AbstractMotor::gearset::blue, {{3.25_in, 10.5_in}, imev5BlueTPR * (600.0 / 450.0)}) // 0.75 = 8_in, 1.0 = 11.5_in, 1.333 = 14_in (SHOULD BE 0.75)
 		.build();
 
 // Device instantiation
-Motor intake(19);
-
-
+Motor intake(16);
 
 pros::ADIDigitalOut piston('A');
+
 
 void disabled() {}
 
@@ -51,10 +57,14 @@ void autonomous() {}
 void opcontrol() {
 	bool togglePiston = false, toggleDunker = false, latchPiston = false, latchDunker = false;
 	float leftY, rightY;
-	double inactive = 0, active = 54;
+	// targetPos = 750 with potentiometer
+	double currentPos, targetPos = 100, inactive = 0, active = 54;
 	Controller controller;
 
-	dunker.tarePosition();
+	dunker.tare_position();
+	dunker.set_brake_mode(MOTOR_BRAKE_HOLD);
+
+	sensor.calibrate();
 
 	while (true) {
 		// may remove this later
@@ -65,11 +75,13 @@ void opcontrol() {
 
 		*/
 
-		pros::lcd::print(0, "%lf",dunker.getPosition());
-		pros::lcd::print(1, "%lf",dunker.getTargetPosition());
+		// print out current and target values for dunker
+		pros::lcd::print(0, "%d", sensor.get_value());
+		pros::lcd::print(1, "%lf",targetPos);
 
 		leftY = controller.getAnalog(ControllerAnalog::leftY);
 		rightY = controller.getAnalog(ControllerAnalog::rightY);
+
 
 		if((abs(leftY) <= 0.3) || (abs(rightY) <= 0.3)) {
 			drive->getModel()->tank(
@@ -106,27 +118,22 @@ void opcontrol() {
 		else
 			latchPiston = false; //once button is released then release the latch too
 
+		// currentPos = sensor.get_value() - initSensor;
+		currentPos = dunker.get_position(); // remove when potentiometer is added
 
-		//dunker
-		if(controller.getDigital(ControllerDigital::A))
-			dunker.moveVelocity(50);
-			//dunker.moveAbsolute(active, 100);
-
-		/*
-		if (toggleDunker)
-			dunker.moveAbsolute(active, 50); 
-		else
-			dunker.moveAbsolute(inactive, 50);
-
-		if (controller.getDigital(ControllerDigital::A)) {
-			if(!latchDunker){ // if latch is false, flip toggle one time and set latch to true
-				toggleDunker = !toggleDunker;
-				latchDunker = true;
-			}
+		// dunker
+		if(controller.getDigital(ControllerDigital::A) && abs(currentPos - targetPos) > 5)
+			if(currentPos < targetPos)
+				dunker.move_voltage(10 * abs(currentPos - targetPos) + 1500);
+			else
+				dunker.move_voltage(0);
+		else if (abs(currentPos - targetPos) <= 5)
+		{
+			dunker.move_voltage(1000);
 		}
+			
 		else
-			latchDunker = false; //once button is released then release the latch too
-		*/
+			dunker.brake();
 
 		pros::delay(20); // Run for 20 ms then update
 	}
