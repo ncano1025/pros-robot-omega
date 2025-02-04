@@ -57,8 +57,8 @@ void autonomous() {}
 void opcontrol() {
 	bool togglePiston = false, toggleDunker = false, latchPiston = false, latchDunker = false;
 	float leftY, rightY;
-	// targetPos = 750 with potentiometer
-	double currentPos, targetPos = 100, inactive = 0, active = 54;
+	// update targetPos based on potentiometer readings
+	double currentPos, targetPos = 750, inactive = 0, active = 54;
 	Controller controller;
 
 	dunker.tare_position();
@@ -118,8 +118,7 @@ void opcontrol() {
 		else
 			latchPiston = false; //once button is released then release the latch too
 
-		// currentPos = sensor.get_value() - initSensor;
-		currentPos = dunker.get_position(); // remove when potentiometer is added
+		currentPos = sensor.get_value() - initSensor;
 
 		// dunker
 		if(controller.getDigital(ControllerDigital::A) && abs(currentPos - targetPos) > 5)
