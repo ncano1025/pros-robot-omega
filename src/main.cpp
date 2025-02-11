@@ -16,7 +16,7 @@ void on_center_button() {
 	}
 }
 
-pros::Motor dunker(8);
+
 pros::ADIAnalogIn sensor('B');
 int initSensor;
 
@@ -26,9 +26,9 @@ void initialize() {
 
 	//pros::lcd::register_btn1_cb(on_center_button);
 
-	dunker.set_brake_mode(MOTOR_BRAKE_HOLD);
+	//dunker.set_brake_mode(MOTOR_BRAKE_HOLD);
 
-	initSensor = sensor.get_value();
+	
 
 }
 
@@ -44,6 +44,7 @@ std::shared_ptr<ChassisController> drive =
 
 // Device instantiation
 Motor intake(16);
+Motor dunker(8);
 
 pros::ADIDigitalOut piston('A');
 
@@ -55,29 +56,21 @@ void competition_initialize() {}
 void autonomous() {}
 
 void opcontrol() {
-	bool togglePiston = false, toggleDunker = false, latchPiston = false, latchDunker = false;
+	bool togglePiston = false, latchPiston = false;
 	float leftY, rightY;
 	// update targetPos based on potentiometer readings
-	double currentPos, targetPos = 750, inactive = 0, active = 54;
+	//double currentPos, targetPos = 1800, inactive = 0, active = 1000;
+	int inactive = 672, active = 861, scoring = 1624, targetPos = inactive, currentPos;
 	Controller controller;
 
-	dunker.tare_position();
-	dunker.set_brake_mode(MOTOR_BRAKE_HOLD);
+	//dunker.set_brake_mode(MOTOR_BRAKE_HOLD);
 
-	sensor.calibrate();
+	set_angles(756, 4528, 750);
+	
+	pros::delay(1000);
+	initSensor = sensor.get_value();
 
 	while (true) {
-		// may remove this later
-		/*
-		pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
-		                 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
-		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);  // Prints status of the emulated screen LCDs
-
-		*/
-
-		// print out current and target values for dunker
-		pros::lcd::print(0, "%d", sensor.get_value());
-		pros::lcd::print(1, "%lf",targetPos);
 
 		leftY = controller.getAnalog(ControllerAnalog::leftY);
 		rightY = controller.getAnalog(ControllerAnalog::rightY);
@@ -112,28 +105,55 @@ void opcontrol() {
 		if (controller.getDigital(ControllerDigital::L1)) {
 			if(!latchPiston){ // if latch is false, flip toggle one time and set latch to true
 				togglePiston = !togglePiston;
-				latchDunker = true;
+				latchPiston = true;
 			}
 		}
 		else
 			latchPiston = false; //once button is released then release the latch too
 
-		currentPos = sensor.get_value() - initSensor;
+		//currentPos = sensor.get_value() - initSensor;
 
 		// dunker
-		if(controller.getDigital(ControllerDigital::A) && abs(currentPos - targetPos) > 5)
-			if(currentPos < targetPos)
-				dunker.move_voltage(10 * abs(currentPos - targetPos) + 1500);
+		/*
+		if(controller.getDigital(ControllerDigital::A) && abs(currentPos - active) > 5) {
+			if(currentPos < active)
+				dunker.move_voltage(10 * abs(currentPos - active) + 1500);
 			else
 				dunker.move_voltage(0);
-		else if (abs(currentPos - targetPos) <= 5)
-		{
-			dunker.move_voltage(1000);
 		}
-			
+		else if(controller.getDigital(ControllerDigital::B) && abs(currentPos - targetPos) > 5) {
+			if(currentPos < targetPos)
+				dunker.move_voltage(10 * abs(currentPos - targetPos) + 1000);
+			else
+				dunker.move_voltage(-100);
+		}
+		else if(controller.getDigital(ControllerDigital::up))
+			dunker.move_voltage(500);
+		else if(controller.getDigital(ControllerDigital::down))
+			dunker.move_voltage(-1000);
 		else
 			dunker.brake();
+		*/
+
+		currentPos = sensor.get_value() - initSensor;
+
+		if(controller.getDigital(ControllerDigital::B))
+			targetPos = inactive;
+		else if(controller.getDigital(ControllerDigital::Y))
+			targetPos = active;
+		else if(controller.getDigital(ControllerDigital::X))
+			targetPos = scoring;
+
+		dunker.moveVoltage(feedforward_kV(targetPos, currentPos) + feedforward_kG(currentPos));
 
 		pros::delay(20); // Run for 20 ms then update
+
+		// print out current and target values for dunker
+		pros::lcd::print(0, "Initial - %d", initSensor);
+		pros::lcd::print(1, "Sensor Val - %d", sensor.get_value());
+		
+		pros::lcd::print(2, "kG - %d", feedforward_kG(sensor.get_value()));
+		pros::lcd::print(3, "kV - %d", feedforward_kV(targetPos, sensor.get_value()));
+		pros::lcd::print(4, "target Position - %d", targetPos);
 	}
 }
