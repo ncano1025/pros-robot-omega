@@ -27,41 +27,214 @@ void initialize() {
 std::shared_ptr<ChassisController> drive = 
 	ChassisControllerBuilder()
 		.withMotors(
-			{-7, -8, -9},
-			{4, 5, 6}
+			{-21, -15, -14},
+			{13, 12, 11}
 			)
 		.withDimensions(AbstractMotor::gearset::blue, {{3.25_in, 10.5_in}, imev5BlueTPR * (600.0 / 450.0)}) // 0.75 = 8_in, 1.0 = 11.5_in, 1.333 = 14_in (SHOULD BE 0.75)
 		.build();
 
 // Device instantiation
-Motor intake(19);
+Motor intake(16);
 pros::ADIDigitalOut piston('A');
 
 void disabled() {}
 
 void competition_initialize() {}
 
-void autonomous() {
-    drive->setMaxVelocity(175);
-	drive->moveRaw(-550);
-	drive->setMaxVelocity(200);
+int port = 6;
+double left_turn_deg = -90, right_turn_deg = 90, turn_speed = 100, target_yaw;
+bool turning = false;
+pros::Imu imu(port);
 
+double get_turn_speed(double start, double end, int velocity){
+    return ((end - start) / 360 > 0.25 ? 0.25 : (end - start) / 360);
+}
+
+void progamming_skills() {
+
+	bool intaking = true;
+
+	//move out
+	drive->setMaxVelocity(100);
+	drive->moveRaw(-335);
+
+	// turn to MG
 	drive->setTurnsMirrored(true);
-	drive->turnRaw(360);
+	drive->turnRaw(-120);
 
-	drive->setMaxVelocity(75);
-	drive->moveRaw(-350);
+	drive->moveRawAsync(-1300);
 
-	pros::delay(500);
+	// clamp MG
+	pros::delay(2500);
 	piston.set_value(true);
 	pros::delay(1000);
 
-	drive->setMaxVelocity(175);
-	drive->moveRawAsync(550);
+	// turn to get the 3-ring
+	drive->turnRaw(-570);
 
+	// start intake and move
 	intake.moveVoltage(12000);
+//
+	// move until red ring
+	drive->setMaxVelocity(150);
+	drive->moveRaw(1600);
+	
+	pros::delay(1500);
+	intake.moveVoltage(0);
+
+	// grab blue ring
+	intake.moveVoltage(6000);
+
+	drive->moveRaw(300);
+	intake.moveVoltage(0);
+
+	// turn 90
+	drive->setMaxVelocity(100);
+	drive->turnRaw(-345);
+
+	// outtake blue ring
+	intake.moveVoltage(-12000);
+
 	pros::delay(2000);
 	intake.moveVoltage(0);
+
+	// turn back
+	drive->turnRaw(330);
+
+// 
+
+	// start intake and move
+	intake.moveVoltage(12000);
+
+	// move until 3rd red ring
+	drive->setMaxVelocity(150);
+	drive->moveRaw(500);
+	
+	pros::delay(1500);
+	intake.moveVoltage(0);
+
+
+	// turn around
+	drive->setMaxVelocity(100);
+	drive->turnRaw(675);
+
+	// move back to old pos of MG
+	drive->setMaxVelocity(150);
+	drive->moveRaw(2400);
+
+	// turn toward 4th ring
+	drive->setMaxVelocity(100);
+	drive->turnRaw(-335);
+
+	// move to and grab 4th ring
+	drive->setMaxVelocity(150);
+	drive->moveRawAsync(800);
+
+	intaking = true;
+
+	while (intaking) {
+		intake.moveVoltage(12000);
+
+		if (intake.getActualVelocity() == 0){
+			intake.moveVoltage(-6000);
+			pros::delay(500);
+		}
+
+		if (drive->isSettled()){
+			intaking = false;
+		}
+	}
+
+	pros::delay(2000);
+	intake.moveVoltage(0);
+
+	// turn towards corner
+	drive->setMaxVelocity(100);
+	drive->turnRaw(500); // tune num
+
+	// move and intake last two rings
+	drive->moveRawAsync(2000);
+	
+	intaking = true;
+
+	while (intaking) {
+		intake.moveVoltage(12000);
+
+		if (intake.getActualVelocity() == 0){
+			intake.moveVoltage(-6000);
+			pros::delay(500);
+		}
+
+		if (drive->isSettled()){
+			intaking = false;
+		}
+	} 
+
+	pros::delay(2000);
+	intake.moveVoltage(0);
+
+	// back up
+	drive->moveRaw(-300);
+
+	// turn MG towards corner
+	drive->setMaxVelocity(100);
+	drive->turnRaw(-670); // tune num
+
+	// move MG into corner
+	drive->moveRaw(-300); // tune num
+
+	// release MG
+	piston.set_value(false);	
+}
+
+void basic_autonomous() {
+	bool outtaking;
+
+	// move out
+	drive->setMaxVelocity(150);
+	drive->moveRaw(610);
+	drive->setMaxVelocity(100);
+	
+	// turn to MG
+	drive->setTurnsMirrored(true);
+	drive->turnRaw(-335);
+
+	// move to MG
+	drive->setMaxVelocity(75);
+	drive->moveRawAsync(-395);
+
+	// clamp MG
+	pros::delay(1250);
+	piston.set_value(true);
+	pros::delay(1000);
+	
+	intake.moveVoltage(12000);
+
+	// move back while running intake
+	drive->setMaxVelocity(175);
+	drive->moveRaw(1300);
+
+	
+	pros::delay(2000);
+	intake.moveVoltage(0);
+
+	// turn towards ladder
+	drive->turnRaw(575);
+
+	// move toward ladder, stop when intake is settled
+	drive->moveRaw(1450);
+	
+	//outtaking = true;
+
+	//intake.moveVoltage(-12000);
+	//pros::delay(5000);
+	
+	//intake.moveVoltage(0);
+}
+
+void autonomous() {
+	//basic_autonomous();
+	basic_autonomous();
 }
 
 void opcontrol() {
@@ -79,6 +252,10 @@ void opcontrol() {
 		// gathering joystick input for drive
 		leftY = controller.getAnalog(ControllerAnalog::leftY);
 		rightY = controller.getAnalog(ControllerAnalog::rightY);
+
+		// auton testing
+		if(controller.getDigital(ControllerDigital::B)) 
+			autonomous();
 
 		// added dampened zone for more precise small movements
 		if((abs(leftY) <= 0.3) || (abs(rightY) <= 0.3)) {
