@@ -57,7 +57,7 @@ void opcontrol() {
 		leftY = controller.getAnalog(ControllerAnalog::leftY);
 		rightY = controller.getAnalog(ControllerAnalog::rightY);
 
-		if((abs(leftY) <= 0.3) || (abs(rightY) <= 0.3)) {
+		if((abs(leftY) <= 0.1) || (abs(rightY) <= 0.1)) {
 			drive->getModel()->tank(
 				leftY * 0.5,
 				rightY * 0.5,
