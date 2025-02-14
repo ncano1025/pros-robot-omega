@@ -63,7 +63,7 @@ void programming_skills() {
 	drive->setTurnsMirrored(true);
 	drive->turnRaw(-120);
 
-	drive->moveRawAsync(-1300);
+	drive->moveRawAsync(-1275);
 
 	// clamp MG
 	pros::delay(2500);
@@ -71,14 +71,14 @@ void programming_skills() {
 	pros::delay(1000);
 
 	// turn to get the 3-ring
-	drive->turnRaw(-570);
+	drive->turnRaw(-560);
 
 	// start intake and move
 	intake.moveVoltage(12000);
-//
+
 	// move until red ring
 	drive->setMaxVelocity(150);
-	drive->moveRaw(1600);
+	drive->moveRaw(1550);
 	
 	pros::delay(1500);
 	intake.moveVoltage(0);
@@ -102,8 +102,6 @@ void programming_skills() {
 	// turn back
 	drive->turnRaw(330);
 
-// 
-
 	// start intake and move
 	intake.moveVoltage(12000);
 
@@ -113,7 +111,6 @@ void programming_skills() {
 	
 	pros::delay(1500);
 	intake.moveVoltage(0);
-
 
 	// turn around
 	drive->setMaxVelocity(100);
@@ -162,7 +159,7 @@ void programming_skills() {
 		intake.moveVoltage(12000);
 
 		if (intake.getActualVelocity() == 0){
-			intake.moveVoltage(-6000);
+			intake.moveVoltage(-12000);
 			pros::delay(500);
 		}
 
@@ -185,7 +182,9 @@ void programming_skills() {
 	drive->moveRaw(-300); // tune num
 
 	// release MG
-	piston.set_value(false);	
+	piston.set_value(false);
+
+	
 }
 
 void basic_autonomous() {
@@ -233,17 +232,93 @@ void basic_autonomous() {
 	//intake.moveVoltage(0);
 }
 
+void basic_3p_autonomous() {
+	bool outtaking, intaking;
+
+	// move out
+	drive->setMaxVelocity(150);
+	drive->moveRaw(610);
+	
+	
+	// turn to MG
+	drive->setTurnsMirrored(true);
+	drive->setMaxVelocity(100);
+	drive->turnRaw(-340);
+
+	// move to MG
+	drive->setMaxVelocity(75);
+	drive->moveRawAsync(-395);
+
+	// clamp MG
+	pros::delay(1250);
+	piston.set_value(true);
+	pros::delay(1000); 
+
+	drive->moveRaw(-725);
+
+	intake.moveVoltage(0);
+
+	// INSERT EXTRA RING HERE
+	drive->setMaxVelocity(100);
+	drive->turnRaw(-150);
+
+	drive->setMaxVelocity(150);
+
+	intake.moveVoltage(12000);
+	drive->moveRaw(300);
+
+	pros::delay(2000);
+	intake.moveVoltage(0);
+
+	drive->setMaxVelocity(100);
+	drive->turnRaw(160);
+	
+	
+	intake.moveVoltage(12000);
+
+	// move back while running intake
+	drive->setMaxVelocity(175);
+	drive->moveRaw(2000);
+
+	
+	pros::delay(2000);
+	intake.moveVoltage(0);
+
+	// turn towards ladder
+	drive->turnRaw(550);
+
+	// move toward ladder, stop when intake is settled
+	drive->moveRaw(1525);
+	
+	//outtaking = true;
+
+	//intake.moveVoltage(-12000);
+	//pros::delay(5000);
+	
+	//intake.moveVoltage(0);
+	
+}
+
 void rush_autonomous() {
+	drive->setMaxVelocity(250);
+
 	//move forward a bit
 	drive->moveRaw(200);
 
+	drive->setMaxVelocity(100);
+
 	//turn towards mobile goal
 	drive->turnRaw(265);
+
+	drive->setMaxVelocity(250);
+
 	//move to corner before MG
 	drive->moveRaw(1350);
 
+
 	//turn backwards
 	drive->turnRaw(1535);
+
 	//move back to MG
 	drive->moveRaw(-600);
 
@@ -258,8 +333,10 @@ void rush_autonomous() {
 }
 
 void autonomous() {
-	//basic_autonomous();
-	programming_skills();
+	//programming_skills();
+	basic_autonomous();
+	//basic_3p_autonomous();
+	//rush_autonomous();
 }
 
 void opcontrol() {
@@ -305,9 +382,9 @@ void opcontrol() {
 
 		// intake/indexer
 		if(controller.getDigital(ControllerDigital::R1))
-			intake.moveVelocity(170);
+			intake.moveVoltage(12000);
 		else if(controller.getDigital(ControllerDigital::R2)) // reverse (in the event the hook gets caught)
-			intake.moveVelocity(-170);
+			intake.moveVoltage(-12000);
 		else 
 			intake.moveVelocity(0);
 
