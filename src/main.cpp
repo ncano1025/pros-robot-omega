@@ -47,10 +47,6 @@ double left_turn_deg = -90, right_turn_deg = 90, turn_speed = 100, target_yaw;
 bool turning = false;
 pros::Imu imu(port);
 
-double get_turn_speed(double start, double end, int velocity){
-    return ((end - start) / 360 > 0.25 ? 0.25 : (end - start) / 360);
-}
-
 void programming_skills() {
 
 	bool intaking = true;
