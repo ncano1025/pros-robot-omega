@@ -1,4 +1,5 @@
 #include "main.h"
+#include "pros/rtos.hpp"
 
 /**
  * A callback function for LLEMU's center button.
@@ -50,7 +51,7 @@ double get_turn_speed(double start, double end, int velocity){
     return ((end - start) / 360 > 0.25 ? 0.25 : (end - start) / 360);
 }
 
-void progamming_skills() {
+void programming_skills() {
 
 	bool intaking = true;
 
@@ -232,9 +233,33 @@ void basic_autonomous() {
 	//intake.moveVoltage(0);
 }
 
+void rush_autonomous() {
+	//move forward a bit
+	drive->moveRaw(200);
+
+	//turn towards mobile goal
+	drive->turnRaw(265);
+	//move to corner before MG
+	drive->moveRaw(1350);
+
+	//turn backwards
+	drive->turnRaw(1535);
+	//move back to MG
+	drive->moveRaw(-600);
+
+	//grab MG
+	pros::delay(500);
+	piston.set_value(true);
+
+	//move to red donut
+	drive->moveRaw(1150);
+
+
+}
+
 void autonomous() {
 	//basic_autonomous();
-	basic_autonomous();
+	programming_skills();
 }
 
 void opcontrol() {
@@ -258,6 +283,7 @@ void opcontrol() {
 			autonomous();
 
 		// added dampened zone for more precise small movements
+		/*
 		if((abs(leftY) <= 0.3) || (abs(rightY) <= 0.3)) {
 			drive->getModel()->tank(
 				leftY * 0.5,
@@ -269,6 +295,13 @@ void opcontrol() {
 				leftY,
 				rightY);
 		}
+		*/
+
+		drive->getModel()->tank(
+				leftY,
+				rightY);
+		
+
 
 		// intake/indexer
 		if(controller.getDigital(ControllerDigital::R1))
