@@ -47,6 +47,8 @@ double left_turn_deg = -90, right_turn_deg = 90, turn_speed = 100, target_yaw;
 bool turning = false;
 pros::Imu imu(port);
 
+// - - - - - - - - - - - - - - - - - - - - [PROGRAMMING SKILLS] - - - - - - - - - - - - - - - - - - - - 
+
 void programming_skills() {
 
 	bool intaking = true;
@@ -70,7 +72,7 @@ void programming_skills() {
 	drive->turnRaw(-560);
 
 	// start intake and move
-	intake.moveVoltage(12000);
+	intake.moveVoltage(10000); // INTAKE SPEED LOWERED
 
 	// move until red ring
 	drive->setMaxVelocity(150);
@@ -165,14 +167,31 @@ void programming_skills() {
 	} 
 
 	pros::delay(2000);
-	intake.moveVoltage(0);
+	//intake.moveVoltage(0);
 
 	// back up
-	drive->moveRaw(-300);
+	drive->moveRawAsync(-300);
+
+	intaking = true;
+
+	while (intaking) {
+		intake.moveVoltage(12000);
+
+		if (intake.getActualVelocity() == 0){
+			intake.moveVoltage(-12000);
+			pros::delay(500);
+		}
+
+		if (drive->isSettled()){
+			intaking = false;
+		}
+	} 
 
 	// turn MG towards corner
 	drive->setMaxVelocity(100);
 	drive->turnRaw(-670); // tune num
+
+	intake.moveVoltage(0);
 
 	// move MG into corner
 	drive->moveRaw(-300); // tune num
@@ -180,15 +199,20 @@ void programming_skills() {
 	// release MG
 	piston.set_value(false);
 
-	
+	// unlatch from MG
+	intake.moveVoltage(-12000);
+	pros::delay(1000);
+	intake.moveVoltage(0);
 }
+
+// - - - - - - - - - - - - - - - - - - - - [AUTONOMOUS] - - - - - - - - - - - - - - - - - - - - 
 
 void basic_autonomous() {
 	bool outtaking;
 
 	// move out
 	drive->setMaxVelocity(150);
-	drive->moveRaw(610);
+	drive->moveRaw(600);
 	drive->setMaxVelocity(100);
 	
 	// turn to MG
