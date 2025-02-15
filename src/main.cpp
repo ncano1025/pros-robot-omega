@@ -375,10 +375,6 @@ void opcontrol() {
 		leftY = controller.getAnalog(ControllerAnalog::leftY);
 		rightY = controller.getAnalog(ControllerAnalog::rightY);
 
-		// auton testing
-		if(controller.getDigital(ControllerDigital::B)) 
-			autonomous();
-
 		// added dampened zone for more precise small movements
 		/*
 		if((abs(leftY) <= 0.3) || (abs(rightY) <= 0.3)) {
