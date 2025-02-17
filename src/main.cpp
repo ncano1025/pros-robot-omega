@@ -55,13 +55,13 @@ void programming_skills() {
 
 	//move out
 	drive->setMaxVelocity(100);
-	drive->moveRaw(-335);
+	drive->moveRaw(-430);
 
 	// turn to MG
 	drive->setTurnsMirrored(true);
-	drive->turnRaw(-120);
+	drive->turnRaw(-115);
 
-	drive->moveRawAsync(-1275);
+	drive->moveRawAsync(-1200);
 
 	// clamp MG
 	pros::delay(2500);
@@ -69,7 +69,7 @@ void programming_skills() {
 	pros::delay(1000);
 
 	// turn to get the 3-ring
-	drive->turnRaw(-560);
+	drive->turnRaw(-545);
 
 	// start intake and move
 	intake.moveVoltage(10000); // INTAKE SPEED LOWERED
@@ -98,10 +98,10 @@ void programming_skills() {
 	intake.moveVoltage(0);
 
 	// turn back
-	drive->turnRaw(330);
+	drive->turnRaw(320);
 
 	// start intake and move
-	intake.moveVoltage(12000);
+	intake.moveVoltage(10000);
 
 	// move until 3rd red ring
 	drive->setMaxVelocity(150);
@@ -129,11 +129,11 @@ void programming_skills() {
 	intaking = true;
 
 	while (intaking) {
-		intake.moveVoltage(12000);
+		intake.moveVoltage(10000);
 
 		if (intake.getActualVelocity() == 0){
 			intake.moveVoltage(-6000);
-			pros::delay(500);
+			pros::delay(250);
 		}
 
 		if (drive->isSettled()){
@@ -154,11 +154,11 @@ void programming_skills() {
 	intaking = true;
 
 	while (intaking) {
-		intake.moveVoltage(12000);
+		intake.moveVoltage(10000);
 
 		if (intake.getActualVelocity() == 0){
 			intake.moveVoltage(-12000);
-			pros::delay(500);
+			pros::delay(250);
 		}
 
 		if (drive->isSettled()){
@@ -175,11 +175,11 @@ void programming_skills() {
 	intaking = true;
 
 	while (intaking) {
-		intake.moveVoltage(12000);
+		intake.moveVoltage(10000);
 
 		if (intake.getActualVelocity() == 0){
 			intake.moveVoltage(-12000);
-			pros::delay(500);
+			pros::delay(250);
 		}
 
 		if (drive->isSettled()){
@@ -353,8 +353,8 @@ void rush_autonomous() {
 }
 
 void autonomous() {
-	//programming_skills();
-	basic_autonomous();
+	programming_skills();
+	//basic_autonomous();
 	//basic_3p_autonomous();
 	//rush_autonomous();
 }
