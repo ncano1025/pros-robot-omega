@@ -17,6 +17,7 @@ void on_center_button() {
 	}
 }
 
+
 void initialize() {
 	pros::lcd::initialize();
 	pros::lcd::set_text(1, "Hello PROS User!");
@@ -28,15 +29,41 @@ void initialize() {
 std::shared_ptr<ChassisController> drive = 
 	ChassisControllerBuilder()
 		.withMotors(
-			{-21, -15, -14},
-			{13, 12, 11}
+			{-19, -5, -13},
+			{11, 12, 16}
 			)
 		.withDimensions(AbstractMotor::gearset::blue, {{3.25_in, 10.5_in}, imev5BlueTPR * (600.0 / 450.0)}) // 0.75 = 8_in, 1.0 = 11.5_in, 1.333 = 14_in (SHOULD BE 0.75)
 		.build();
 
 // Device instantiation
-Motor intake(16);
+Motor intake1(-8); //right intake
+Motor intake2(20); //left intake
 pros::ADIDigitalOut piston('A');
+
+void intakingAutoFwd() {
+	intake1.moveVoltage(12000);
+	intake2.moveVoltage(-12000);
+}
+
+void intakingAutoBack() {
+	intake1.moveVoltage(-12000);
+	intake2.moveVoltage(12000);
+}
+
+void driveIntakingForward() {
+	intake1.moveVoltage(12000);
+	intake2.moveVoltage(-12000);
+}
+
+void driveIntakingBackward() {
+	intake1.moveVoltage(-12000);
+	intake2.moveVoltage(12000);
+}
+
+void intakeStop() {
+	intake1.moveVoltage(0);
+	intake2.moveVoltage(0);
+}
 
 void disabled() {}
 
@@ -52,140 +79,193 @@ double get_turn_speed(double start, double end, int velocity){
 }
 
 void programming_skills() {
+	//front right railing, aligned w/ end closest wall 4th triangle
 
-	bool intaking = true;
-
-	//move out
+	//backup, turn, get MG
 	drive->setMaxVelocity(100);
-	drive->moveRaw(-335);
-
-	// turn to MG
-	drive->setTurnsMirrored(true);
-	drive->turnRaw(-120);
-
-	drive->moveRawAsync(-1300);
-
-	// clamp MG
-	pros::delay(2500);
+	drive->moveRaw(-275); //prev 225, 235
+	pros::delay(50);
+	drive->setMaxVelocity(100);
+	drive->turnRaw(130); //162, 167, 172, 149
+	pros::delay(50);
+	drive->setMaxVelocity(200);
+	drive->moveRawAsync(-1200); //1200
+	pros::delay(1200);
 	piston.set_value(true);
-	pros::delay(1000);
-
-	// turn to get the 3-ring
-	drive->turnRaw(-570);
-
-	// start intake and move
-	intake.moveVoltage(12000);
-//
-	// move until red ring
-	drive->setMaxVelocity(150);
-	drive->moveRaw(1600);
-	
-	pros::delay(1500);
-	intake.moveVoltage(0);
-
-	// grab blue ring
-	intake.moveVoltage(6000);
-
-	drive->moveRaw(300);
-	intake.moveVoltage(0);
-
-	// turn 90
-	drive->setMaxVelocity(100);
-	drive->turnRaw(-345);
-
-	// outtake blue ring
-	intake.moveVoltage(-12000);
-
-	pros::delay(2000);
-	intake.moveVoltage(0);
-
-	// turn back
-	drive->turnRaw(330);
-
-// 
-
-	// start intake and move
-	intake.moveVoltage(12000);
-
-	// move until 3rd red ring
-	drive->setMaxVelocity(150);
-	drive->moveRaw(500);
-	
-	pros::delay(1500);
-	intake.moveVoltage(0);
+	pros::delay(200);
 
 
-	// turn around
-	drive->setMaxVelocity(100);
-	drive->turnRaw(675);
+	//get first ring
+	drive->setMaxVelocity(120);
+	drive->turnRaw(547); //605
+	pros::delay(50);
+	drive->setMaxVelocity(250);
+	drive->moveRawAsync(900);
+	bool intake_running = true;
+	while (intake_running) {
+		intakingAutoFwd();
 
-	// move back to old pos of MG
-	drive->setMaxVelocity(150);
-	drive->moveRaw(2400);
-
-	// turn toward 4th ring
-	drive->setMaxVelocity(100);
-	drive->turnRaw(-335);
-
-	// move to and grab 4th ring
-	drive->setMaxVelocity(150);
-	drive->moveRawAsync(800);
-
-	intaking = true;
-
-	while (intaking) {
-		intake.moveVoltage(12000);
-
-		if (intake.getActualVelocity() == 0){
-			intake.moveVoltage(-6000);
-			pros::delay(500);
+		if (intake2.getActualVelocity() == 0) {
+			intake2.moveVelocity(-10000);
+			pros::delay(100);
+			intake2.moveVelocity(10000);
 		}
 
-		if (drive->isSettled()){
-			intaking = false;
+		if (drive->isSettled()) {
+			intake_running = false;
+		}
+	}
+	intakingAutoFwd();
+	pros::delay(850);
+
+	//turn around and go straight
+	drive->setMaxVelocity(100);
+	intake1.moveVoltage(0);
+	drive->turnRaw(880); //if stops working go 880, 895
+	intakingAutoFwd();
+	drive->setMaxVelocity(150);
+	pros::delay(350);
+	drive->moveRawAsync(2750); //return to 2450, 2650-2750
+	intake_running = true;
+	while (intake_running) {
+		intakingAutoFwd();
+
+		if (intake2.getActualVelocity() == 0) {
+			intakingAutoBack();
+			pros::delay(100);
+			intake2.moveVelocity(10000);
+		}
+
+		if (drive->isSettled()) {
+			intake_running = false;
+		}
+	}
+	pros::delay(250);
+
+	//turn right 90, move forward
+	drive->setMaxVelocity(150);
+	drive->turnRaw(350); //350
+	pros::delay(350);
+	drive->setMaxVelocity(250);
+	drive->moveRawAsync(1300);
+	while (intake_running) {
+		intakingAutoFwd();
+
+		if (intake2.getActualVelocity() == 0) {
+			intake2.moveVelocity(-10000);
+			pros::delay(100);
+			intake2.moveVelocity(10000);
+		}
+
+		if (drive->isSettled()) {
+			intake_running = false;
 		}
 	}
 
+	//turn left 90, move forward
 	pros::delay(2000);
-	intake.moveVoltage(0);
+	drive->setMaxVelocity(150);
+	drive->turnRaw(-355); //382 or 342
+	pros::delay(200);
+	drive->moveRawAsync(1600);
+	intake_running = true;
+	while (intake_running) {
+		intakingAutoFwd();
 
-	// turn towards corner
-	drive->setMaxVelocity(100);
-	drive->turnRaw(500); // tune num
-
-	// move and intake last two rings
-	drive->moveRawAsync(2000);
-	
-	intaking = true;
-
-	while (intaking) {
-		intake.moveVoltage(12000);
-
-		if (intake.getActualVelocity() == 0){
-			intake.moveVoltage(-6000);
-			pros::delay(500);
+		if (intake2.getActualVelocity() == 0) {
+			intake2.moveVelocity(-10000);
+			pros::delay(100);
+			intake2.moveVelocity(10000);
 		}
 
-		if (drive->isSettled()){
-			intaking = false;
+		if (drive->isSettled()) {
+			intake_running = false;
 		}
-	} 
+	}
 
-	pros::delay(2000);
-	intake.moveVoltage(0);
+	//ram into wall
+	drive->moveRaw(800);
+	pros::delay(300);
+	intakingAutoBack();
+	pros::delay(200);
+	intakingAutoFwd();
+	drive->moveRaw(-800);
 
-	// back up
-	drive->moveRaw(-300);
+	//deposit MG at corner 1
+	pros::delay(300);
+	intakingAutoFwd();
+	pros::delay(300);
+	drive->turnRaw(-680);
+	for (int i = 0; i < 5; i++) {
+		intakingAutoBack();
+		pros::delay(100);
+		intakingAutoFwd();
+	}
+	drive->moveRaw(-1000); //550 or 350
+	piston.set_value(false);
 
-	// turn MG towards corner
-	drive->setMaxVelocity(100);
-	drive->turnRaw(-670); // tune num
+	pros::delay(250);
 
-	// move MG into corner
-	drive->moveRaw(-300); // tune num
+	//turn left, aimed for next
+	intakeStop();
+	drive->moveRaw(500);
+	drive->turnRaw(-165);
 
-	// release MG
-	piston.set_value(false);	
+	//move to mg2
+	drive->setMaxVelocity(300);
+	drive->moveRaw(2850);
+
+	//turn and clamp
+	pros::delay(250);
+	drive->setMaxVelocity(150);
+	drive->turnRaw(-360);
+	pros::delay(100);
+	drive->moveRawAsync(-950);
+	pros::delay(1150);
+	piston.set_value(true);
+
+
+	//turn and go forward
+	pros::delay(100);
+	intakingAutoFwd();
+	drive->turnRaw(-588);
+	pros::delay(100);
+	drive->setMaxVelocity(250);
+	drive->moveRaw(900);
+	pros::delay(100);
+	drive->setMaxVelocity(150);
+	pros::delay(100);
+	drive->moveRaw(3750);
+	pros::delay(100);
+
+	//back up turn around, deposit mg, back up, move forward
+	intakeStop();
+	drive->moveRaw(-500);
+	drive->turnRaw(680);
+	drive->moveRaw(-800);
+	pros::delay(500);
+	piston.set_value(false);
+	drive->moveRaw(500);
+
+
+	//get last mg and try to get the 2 rings under ladder
+	pros::delay(100);
+	drive->turnRaw(220);
+	pros::delay(100);
+	drive->setMaxVelocity(300);
+	drive->moveRaw(2950);
+	pros::delay(100);
+	drive->setMaxVelocity(150);
+	drive->turnRaw(390);
+	pros::delay(100);
+	drive->moveRawAsync(-1150);
+	pros::delay(1300);
+	piston.set_value(true);
+	drive->turnRaw(545);
+	pros::delay(100);
+	drive->moveRaw(1800);
+
+	imu.get_quaternion();
 }
 
 void basic_autonomous() {
@@ -209,7 +289,7 @@ void basic_autonomous() {
 	piston.set_value(true);
 	pros::delay(1000);
 	
-	intake.moveVoltage(12000);
+	intakingAutoFwd();
 
 	// move back while running intake
 	drive->setMaxVelocity(175);
@@ -217,7 +297,7 @@ void basic_autonomous() {
 
 	
 	pros::delay(2000);
-	intake.moveVoltage(0);
+	intakeStop();
 
 	// turn towards ladder
 	drive->turnRaw(575);
@@ -231,6 +311,8 @@ void basic_autonomous() {
 	//pros::delay(5000);
 	
 	//intake.moveVoltage(0);
+
+	
 }
 
 void rush_autonomous() {
@@ -305,11 +387,11 @@ void opcontrol() {
 
 		// intake/indexer
 		if(controller.getDigital(ControllerDigital::R1))
-			intake.moveVelocity(170);
+			driveIntakingForward();
 		else if(controller.getDigital(ControllerDigital::R2)) // reverse (in the event the hook gets caught)
-			intake.moveVelocity(-170);
+			driveIntakingBackward();
 		else 
-			intake.moveVelocity(0);
+			intakeStop();
 
 		// clamp toggle
 		if (toggle)
