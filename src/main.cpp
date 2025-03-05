@@ -40,6 +40,9 @@ Motor intake1(-8); //right intake
 Motor intake2(20); //left intake
 pros::ADIDigitalOut piston('A');
 
+
+
+//Intake management functions
 void intakingAutoFwd() {
 	intake1.moveVoltage(12000);
 	intake2.moveVoltage(-12000);
@@ -69,14 +72,91 @@ void disabled() {}
 
 void competition_initialize() {}
 
-int port = 6;
-double left_turn_deg = -90, right_turn_deg = 90, turn_speed = 100, target_yaw;
-bool turning = false;
-pros::Imu imu(port);
 
-double get_turn_speed(double start, double end, int velocity){
-    return ((end - start) / 360 > 0.25 ? 0.25 : (end - start) / 360);
+
+//begin fucking around with quaternions
+
+pros::Imu imu(1);
+
+//get the yaw from quaternion
+
+/*	NOTES
+imu.get_quaternion returns a STRUCT with w, x, y, z
+yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
+in case ever needed: Qt's Yaw sin component = 2(wz + xy), qt's yaw cos component = 1 - 2(y^2 + z^2)
+need to tune PID constants
+
+*/
+double getYawQuaternion() {
+	pros::quaternion_s_t qt = imu.get_quaternion();
+
+	//error fetching quat, retry
+	if (qt.w == PROS_ERR_F) {
+		qt = imu.get_quaternion();
+		if (qt.w == PROS_ERR_F) {
+			pros::lcd::set_text(1, "ERROR: IMU Quaternion Fetch Failed");
+			return -1.0;
+		}
+	}
+
+	//convert quat to yaw
+	double yaw = atan2(2 * ((qt.w * qt.z) + (qt.x * qt.y)), 1 - (2 * ((qt.y * qt.y) + (qt.z * qt.z)))); //yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
+
+	//returns yaw converted from rad to deg; angle is returned from -180 to 180
+	return yaw * (180 / M_PI);
 }
+
+void turnAngleQuat(double angle) {
+	double initialYaw = getYawQuaternion();
+	double targetYaw = initialYaw + angle;
+
+	//normalize angles to -180 - 180
+	if (targetYaw > 180) {
+		targetYaw -= 360;
+	}
+	if (targetYaw < -180) {
+		targetYaw += 360;
+	}
+
+	//Custom PID
+	//PID constants
+    double kP = 1.2;   // Proportional gain (affects how aggressively it turns)
+    double kI = 0.01;  // Integral gain (helps correct small errors)
+    double kD = 0.4;   // Derivative gain (reduces overshoot)
+
+    double diff = 0; // Difference between target and actual yaw
+    double integral = 0, derivative = 0, prevDiff = 0, turnSpeed = 0; //PID components
+
+
+	while (fabs(diff) > 0.75) { // Loop until within 0.5° of target
+        double currentYaw = getYawQuaternion();
+
+        // Calculate shortest turn direction ; normalize -180 to 180
+        diff = targetYaw - currentYaw;
+        if (diff > 180) diff -= 360; 
+        if (diff < -180) diff += 360;
+
+        integral += diff * 0.02;
+        derivative = (diff - prevDiff) / 0.02;
+
+        turnSpeed = (kP * diff) + (kI * integral) + (kD * derivative);
+
+        // Limit motor power to avoid excessive speed
+        turnSpeed = fmax(fmin(turnSpeed, 0.8), -0.8);
+
+        drive->getModel()->tank(-turnSpeed, turnSpeed);
+
+        prevDiff = diff; // Store previous error
+        pros::delay(20); // Small delay for PID loop stability
+    }
+
+    // Stop motors when target is reached
+    drive->getModel()->stop();
+}
+
+
+
+
 
 void programming_skills() {
 	//front right railing, aligned w/ end closest wall 4th triangle
