@@ -264,8 +264,6 @@ void programming_skills() {
 	drive->turnRaw(545);
 	pros::delay(100);
 	drive->moveRaw(1800);
-
-	imu.get_quaternion();
 }
 
 void basic_autonomous() {
