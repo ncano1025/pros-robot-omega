@@ -1,5 +1,9 @@
 #include "main.h"
+#include "liblvgl/llemu.hpp"
+#include "okapi/impl/util/timeUtilFactory.hpp"
+#include "pros/llemu.hpp"
 #include "pros/rtos.hpp"
+#include <cmath>
 
 /**
  * A callback function for LLEMU's center button.
@@ -76,7 +80,7 @@ void competition_initialize() {}
 
 //begin fucking around with quaternions
 
-pros::Imu imu(1);
+pros::Imu imu(2);
 
 //get the yaw from quaternion
 
@@ -95,7 +99,7 @@ double getYawQuaternion() {
 		qt = imu.get_quaternion();
 		if (qt.w == PROS_ERR_F) {
 			pros::lcd::set_text(1, "ERROR: IMU Quaternion Fetch Failed");
-			return -1.0;
+			return 360.0;
 		}
 	}
 
@@ -106,8 +110,34 @@ double getYawQuaternion() {
 	return yaw * (180 / M_PI);
 }
 
+double calcAbsAngle(double targetAbsoluteAngle) {
+    double currentYaw = getYawQuaternion(); // Get current heading
+    pros::lcd::print(3, "Current Yaw: %lf", currentYaw);
+
+    // Normalize target angle to -180 to 180 range
+    if (targetAbsoluteAngle > 180) targetAbsoluteAngle -= 360;
+    if (targetAbsoluteAngle < -180) targetAbsoluteAngle += 360;
+
+    // Compute shortest turn direction
+    double turnAmount = targetAbsoluteAngle - currentYaw;
+
+    // Ensure shortest turn (-180 to 180)
+    if (turnAmount > 180) turnAmount -= 360;
+    if (turnAmount < -180) turnAmount += 360;
+
+    pros::lcd::print(4, "Target Yaw: %lf | Turn Amt: %lf", targetAbsoluteAngle, turnAmount);
+    
+    return turnAmount; // Return the relative angle to turn
+}
+
+
 void turnAngleQuat(double angle) {
 	double initialYaw = getYawQuaternion();
+	if (initialYaw == 360.0) {
+		pros::delay(2000);
+		pros::lcd::set_text(2, "ERROR: Quaternion Cannot be Fetched");
+		return;
+	}
 	double targetYaw = initialYaw + angle;
 
 	//normalize angles to -180 - 180
@@ -121,33 +151,61 @@ void turnAngleQuat(double angle) {
 	//Custom PID
 	//PID constants
     double kP = 1.2;   // Proportional gain (affects how aggressively it turns)
-    double kI = 0.01;  // Integral gain (helps correct small errors)
-    double kD = 0.4;   // Derivative gain (reduces overshoot)
+    double kI = 0.001;  // Integral gain (helps correct small errors)
+    double kD = 0.002;   // Derivative gain (reduces overshoot)
 
-    double diff = 0; // Difference between target and actual yaw
     double integral = 0, derivative = 0, prevDiff = 0, turnSpeed = 0; //PID components
+	double currentYaw = getYawQuaternion();
+	double diff = targetYaw - currentYaw; // Difference between target and actual yaw
+	int count = 0;
 
-
-	while (fabs(diff) > 0.75) { // Loop until within 0.5° of target
-        double currentYaw = getYawQuaternion();
+	while (count <= 5) { // Loop until within 0.5° of target
+        currentYaw = getYawQuaternion();
 
         // Calculate shortest turn direction ; normalize -180 to 180
         diff = targetYaw - currentYaw;
+		//pros::lcd::print(1, "Cur Diff %lf", diff);
+
+		//normalizes to quaternion angle
         if (diff > 180) diff -= 360; 
         if (diff < -180) diff += 360;
 
-        integral += diff * 0.02;
+        integral += diff * 0.01;
         derivative = (diff - prevDiff) / 0.02;
 
         turnSpeed = (kP * diff) + (kI * integral) + (kD * derivative);
 
         // Limit motor power to avoid excessive speed
-        turnSpeed = fmax(fmin(turnSpeed, 0.8), -0.8);
+        double limSpeed = fmax(0.12, fmin(0.3, fabs(diff) / 50.0)); // Dynamic scaling
 
-        drive->getModel()->tank(-turnSpeed, turnSpeed);
+		turnSpeed = (kP * diff) + (kI * integral) + (kD * derivative);
+
+		// Scale down as `diff` decreases
+		turnSpeed = fmax(fmin(turnSpeed, limSpeed), -limSpeed);
+		//pros::lcd::print(2, "Cur: turnspeed + %lf", turnSpeed);
+		
+		
+		//if fabs turna ngle is less than .13, and if the turn angle is negative, turnraw neg, if turn angle was og pos, turn pos
+		if (fabs(turnSpeed) < 0.13001) {
+			//pros::lcd::set_text(5, "PLEASE HELP ME, IM TRYING TO TURN, BUT MY MOTORS ARE A BITCH");
+			if (turnSpeed < 0) {
+				drive->turnRawAsync(-11);
+			} else if (turnSpeed > 0) {
+				drive->turnRawAsync(11);
+			}
+		} else {
+			drive->getModel()->tank(turnSpeed, -turnSpeed);
+		}
+
+		if (fabs(diff) <= 0.4) {
+			count++;
+		}
+		if (fabs(diff) > 0.4) {
+			count = 0;
+		}
 
         prevDiff = diff; // Store previous error
-        pros::delay(20); // Small delay for PID loop stability
+        pros::delay(10); // Small delay for PID loop stability
     }
 
     // Stop motors when target is reached
@@ -417,9 +475,118 @@ void rush_autonomous() {
 
 }
 
+void quaternion_testing() {
+	pros::lcd::set_text(1, "Calibrating IMU");
+	imu.reset();
+	pros::delay(3000);
+	pros::lcd::set_text(1, "Calibration done");
+
+	//get first mg
+	turnAngleQuat(calcAbsAngle(27.25));
+	drive->setMaxVelocity(200);
+	drive->moveRawAsync(-1300); //1200
+	pros::delay(1200);
+	piston.set_value(true);
+	pros::delay(200);
+
+	//turn and get ring 1
+	turnAngleQuat(calcAbsAngle(180));
+	pros::delay(200);
+	drive->setMaxVelocity(250);
+	intakingAutoFwd();
+	drive->moveRaw(900);
+	pros::delay(200);
+	intakeStop();
+
+
+	//turn to 45, collect 2 & 3
+	turnAngleQuat(calcAbsAngle(44));
+	pros::delay(200);
+	intakingAutoFwd();
+	drive->moveRaw(2750);
+	pros::delay(500);
+
+	//turn right 90, get ring 4
+	turnAngleQuat(calcAbsAngle(135));
+	pros::delay(200);
+	drive->moveRaw(1300);
+	pros::delay(200);
+
+	//turn left 90, get ring 5 and 6
+	turnAngleQuat(-90);
+	pros::delay(200);
+	drive->moveRaw(2400);
+
+	//backup and turn 180
+	drive->moveRaw(-600);
+	pros::delay(200);
+	turnAngleQuat(179.8);
+	pros::delay(200);
+	intakeStop();
+
+	//deposit MG1
+	drive->setMaxVelocity(100);
+	drive->moveRaw(-650);
+	piston.set_value(false);
+	intakingAutoBack();
+	pros::delay(100);
+	intakeStop();
+	drive->setMaxVelocity(250);
+	drive->moveRaw(600);
+	pros::delay(150);
+
+	//move up to next MG
+	turnAngleQuat(calcAbsAngle(0.5));
+	pros::delay(300);
+	drive->moveRaw(-2800);
+	pros::delay(200);
+
+	//turn to and clamp MG2
+	turnAngleQuat(calcAbsAngle(90));
+	drive->moveRaw(-900);
+	pros::delay(50);
+	piston.set_value(true);
+	pros::delay(100);
+
+	//turn drive straight get 2nd MG 1-4
+	turnAngleQuat(calcAbsAngle(-45));
+	intakingAutoFwd();
+	pros::delay(100);
+	drive->moveRaw(4850);
+	pros::delay(100);
+
+	//turn around and deposit MG2
+	drive->moveRaw(-600);
+	pros::delay(100);
+	turnAngleQuat(179.3);
+	pros::delay(100);
+	drive->moveRawAsync(-1000);
+	pros::delay(1050);
+	piston.set_value(false);
+	pros::delay(100);
+	drive->moveRaw(600);
+	pros::delay(100);
+
+	//move forward to MG3
+	turnAngleQuat(calcAbsAngle(0));
+	pros::delay(200);
+	drive->moveRaw(2950);
+	turnAngleQuat(-90);
+	
+
+
+
+
+
+
+
+
+	pros::delay(2000);
+}
+
 void autonomous() {
 	//basic_autonomous();
-	programming_skills();
+	quaternion_testing();
 }
 
 void opcontrol() {
