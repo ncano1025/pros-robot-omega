@@ -1,5 +1,6 @@
 #include "main.h"
 #include "liblvgl/llemu.hpp"
+#include "okapi/impl/device/controllerUtil.hpp"
 #include "okapi/impl/util/timeUtilFactory.hpp"
 #include "pros/llemu.hpp"
 #include "pros/rtos.hpp"
@@ -22,9 +23,12 @@ void on_center_button() {
 }
 
 
+pros::Imu imu(2);
+
 void initialize() {
 	pros::lcd::initialize();
 	pros::lcd::set_text(1, "Hello PROS User!");
+	imu.reset();
 
 	pros::lcd::register_btn1_cb(on_center_button);
 }
@@ -76,12 +80,6 @@ void disabled() {}
 
 void competition_initialize() {}
 
-
-
-//begin fucking around with quaternions
-
-pros::Imu imu(2);
-
 //get the yaw from quaternion
 
 /*	NOTES
@@ -89,7 +87,6 @@ imu.get_quaternion returns a STRUCT with w, x, y, z
 yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
 in case ever needed: Qt's Yaw sin component = 2(wz + xy), qt's yaw cos component = 1 - 2(y^2 + z^2)
 need to tune PID constants
-
 */
 double getYawQuaternion() {
 	pros::quaternion_s_t qt = imu.get_quaternion();
@@ -150,16 +147,16 @@ void turnAngleQuat(double angle) {
 
 	//Custom PID
 	//PID constants
-    double kP = 1.2;   // Proportional gain (affects how aggressively it turns)
+    double kP = 0.8;   // Proportional gain (affects how aggressively it turns)
     double kI = 0.001;  // Integral gain (helps correct small errors)
-    double kD = 0.002;   // Derivative gain (reduces overshoot)
+    double kD = 0.15;   // Derivative gain (reduces overshoot)
 
     double integral = 0, derivative = 0, prevDiff = 0, turnSpeed = 0; //PID components
 	double currentYaw = getYawQuaternion();
 	double diff = targetYaw - currentYaw; // Difference between target and actual yaw
 	int count = 0;
 
-	while (count <= 5) { // Loop until within 0.5° of target
+	while (count <= 10) { // Loop until within 0.5° of target
         currentYaw = getYawQuaternion();
 
         // Calculate shortest turn direction ; normalize -180 to 180
@@ -170,13 +167,14 @@ void turnAngleQuat(double angle) {
         if (diff > 180) diff -= 360; 
         if (diff < -180) diff += 360;
 
-        integral += diff * 0.01;
-        derivative = (diff - prevDiff) / 0.02;
+		integral += diff * 0.001;
+
+        derivative = (diff - prevDiff) / 0.3;
 
         turnSpeed = (kP * diff) + (kI * integral) + (kD * derivative);
 
         // Limit motor power to avoid excessive speed
-        double limSpeed = fmax(0.12, fmin(0.3, fabs(diff) / 50.0)); // Dynamic scaling
+        double limSpeed = fmax(0.009, fmin(0.19, fabs(diff) / 225.0)); // Limits speed between .0075 & 0.18
 
 		turnSpeed = (kP * diff) + (kI * integral) + (kD * derivative);
 
@@ -184,295 +182,24 @@ void turnAngleQuat(double angle) {
 		turnSpeed = fmax(fmin(turnSpeed, limSpeed), -limSpeed);
 		//pros::lcd::print(2, "Cur: turnspeed + %lf", turnSpeed);
 		
-		
-		//if fabs turna ngle is less than .13, and if the turn angle is negative, turnraw neg, if turn angle was og pos, turn pos
-		if (fabs(turnSpeed) < 0.13001) {
-			//pros::lcd::set_text(5, "PLEASE HELP ME, IM TRYING TO TURN, BUT MY MOTORS ARE A BITCH");
-			if (turnSpeed < 0) {
-				drive->turnRawAsync(-11);
-			} else if (turnSpeed > 0) {
-				drive->turnRawAsync(11);
-			}
-		} else {
-			drive->getModel()->tank(turnSpeed, -turnSpeed);
-		}
+		drive->getModel()->left(turnSpeed);
+		drive->getModel()->right(-turnSpeed);
 
-		if (fabs(diff) <= 0.4) {
+        prevDiff = diff; // Store previous error
+
+		if (fabs(diff) < 0.1) {
 			count++;
-		}
-		if (fabs(diff) > 0.4) {
+		} else {
 			count = 0;
 		}
 
-        prevDiff = diff; // Store previous error
-        pros::delay(10); // Small delay for PID loop stability
+		
+        pros::delay(5); // Small delay for PID loop stability
     }
 
     // Stop motors when target is reached
+	pros::lcd::set_text(1, "TURN COMPLETE!");
     drive->getModel()->stop();
-}
-
-
-
-
-
-void programming_skills() {
-	//front right railing, aligned w/ end closest wall 4th triangle
-
-	//backup, turn, get MG
-	drive->setMaxVelocity(100);
-	drive->moveRaw(-275); //prev 225, 235
-	pros::delay(50);
-	drive->setMaxVelocity(100);
-	drive->turnRaw(130); //162, 167, 172, 149
-	pros::delay(50);
-	drive->setMaxVelocity(200);
-	drive->moveRawAsync(-1200); //1200
-	pros::delay(1200);
-	piston.set_value(true);
-	pros::delay(200);
-
-
-	//get first ring
-	drive->setMaxVelocity(120);
-	drive->turnRaw(547); //605
-	pros::delay(50);
-	drive->setMaxVelocity(250);
-	drive->moveRawAsync(900);
-	bool intake_running = true;
-	while (intake_running) {
-		intakingAutoFwd();
-
-		if (intake2.getActualVelocity() == 0) {
-			intake2.moveVelocity(-10000);
-			pros::delay(100);
-			intake2.moveVelocity(10000);
-		}
-
-		if (drive->isSettled()) {
-			intake_running = false;
-		}
-	}
-	intakingAutoFwd();
-	pros::delay(850);
-
-	//turn around and go straight
-	drive->setMaxVelocity(100);
-	intake1.moveVoltage(0);
-	drive->turnRaw(880); //if stops working go 880, 895
-	intakingAutoFwd();
-	drive->setMaxVelocity(150);
-	pros::delay(350);
-	drive->moveRawAsync(2750); //return to 2450, 2650-2750
-	intake_running = true;
-	while (intake_running) {
-		intakingAutoFwd();
-
-		if (intake2.getActualVelocity() == 0) {
-			intakingAutoBack();
-			pros::delay(100);
-			intake2.moveVelocity(10000);
-		}
-
-		if (drive->isSettled()) {
-			intake_running = false;
-		}
-	}
-	pros::delay(250);
-
-	//turn right 90, move forward
-	drive->setMaxVelocity(150);
-	drive->turnRaw(350); //350
-	pros::delay(350);
-	drive->setMaxVelocity(250);
-	drive->moveRawAsync(1300);
-	while (intake_running) {
-		intakingAutoFwd();
-
-		if (intake2.getActualVelocity() == 0) {
-			intake2.moveVelocity(-10000);
-			pros::delay(100);
-			intake2.moveVelocity(10000);
-		}
-
-		if (drive->isSettled()) {
-			intake_running = false;
-		}
-	}
-
-	//turn left 90, move forward
-	pros::delay(2000);
-	drive->setMaxVelocity(150);
-	drive->turnRaw(-355); //382 or 342
-	pros::delay(200);
-	drive->moveRawAsync(1600);
-	intake_running = true;
-	while (intake_running) {
-		intakingAutoFwd();
-
-		if (intake2.getActualVelocity() == 0) {
-			intake2.moveVelocity(-10000);
-			pros::delay(100);
-			intake2.moveVelocity(10000);
-		}
-
-		if (drive->isSettled()) {
-			intake_running = false;
-		}
-	}
-
-	//ram into wall
-	drive->moveRaw(800);
-	pros::delay(300);
-	intakingAutoBack();
-	pros::delay(200);
-	intakingAutoFwd();
-	drive->moveRaw(-800);
-
-	//deposit MG at corner 1
-	pros::delay(300);
-	intakingAutoFwd();
-	pros::delay(300);
-	drive->turnRaw(-680);
-	for (int i = 0; i < 5; i++) {
-		intakingAutoBack();
-		pros::delay(100);
-		intakingAutoFwd();
-	}
-	drive->moveRaw(-1000); //550 or 350
-	piston.set_value(false);
-
-	pros::delay(250);
-
-	//turn left, aimed for next
-	intakeStop();
-	drive->moveRaw(500);
-	drive->turnRaw(-165);
-
-	//move to mg2
-	drive->setMaxVelocity(300);
-	drive->moveRaw(2850);
-
-	//turn and clamp
-	pros::delay(250);
-	drive->setMaxVelocity(150);
-	drive->turnRaw(-360);
-	pros::delay(100);
-	drive->moveRawAsync(-950);
-	pros::delay(1150);
-	piston.set_value(true);
-
-
-	//turn and go forward
-	pros::delay(100);
-	intakingAutoFwd();
-	drive->turnRaw(-588);
-	pros::delay(100);
-	drive->setMaxVelocity(250);
-	drive->moveRaw(900);
-	pros::delay(100);
-	drive->setMaxVelocity(150);
-	pros::delay(100);
-	drive->moveRaw(3750);
-	pros::delay(100);
-
-	//back up turn around, deposit mg, back up, move forward
-	intakeStop();
-	drive->moveRaw(-500);
-	drive->turnRaw(680);
-	drive->moveRaw(-800);
-	pros::delay(500);
-	piston.set_value(false);
-	drive->moveRaw(500);
-
-
-	//get last mg and try to get the 2 rings under ladder
-	pros::delay(100);
-	drive->turnRaw(220);
-	pros::delay(100);
-	drive->setMaxVelocity(300);
-	drive->moveRaw(2950);
-	pros::delay(100);
-	drive->setMaxVelocity(150);
-	drive->turnRaw(390);
-	pros::delay(100);
-	drive->moveRawAsync(-1150);
-	pros::delay(1300);
-	piston.set_value(true);
-	drive->turnRaw(545);
-	pros::delay(100);
-	drive->moveRaw(1800);
-}
-
-void basic_autonomous() {
-	bool outtaking;
-
-	// move out
-	drive->setMaxVelocity(150);
-	drive->moveRaw(610);
-	drive->setMaxVelocity(100);
-	
-	// turn to MG
-	drive->setTurnsMirrored(true);
-	drive->turnRaw(-335);
-
-	// move to MG
-	drive->setMaxVelocity(75);
-	drive->moveRawAsync(-395);
-
-	// clamp MG
-	pros::delay(1250);
-	piston.set_value(true);
-	pros::delay(1000);
-	
-	intakingAutoFwd();
-
-	// move back while running intake
-	drive->setMaxVelocity(175);
-	drive->moveRaw(1300);
-
-	
-	pros::delay(2000);
-	intakeStop();
-
-	// turn towards ladder
-	drive->turnRaw(575);
-
-	// move toward ladder, stop when intake is settled
-	drive->moveRaw(1450);
-	
-	//outtaking = true;
-
-	//intake.moveVoltage(-12000);
-	//pros::delay(5000);
-	
-	//intake.moveVoltage(0);
-
-	
-}
-
-void rush_autonomous() {
-	//move forward a bit
-	drive->moveRaw(200);
-
-	//turn towards mobile goal
-	drive->turnRaw(265);
-	//move to corner before MG
-	drive->moveRaw(1350);
-
-	//turn backwards
-	drive->turnRaw(1535);
-	//move back to MG
-	drive->moveRaw(-600);
-
-	//grab MG
-	pros::delay(500);
-	piston.set_value(true);
-
-	//move to red donut
-	drive->moveRaw(1150);
-
-
 }
 
 void quaternion_testing() {
@@ -500,7 +227,7 @@ void quaternion_testing() {
 
 
 	//turn to 45, collect 2 & 3
-	turnAngleQuat(calcAbsAngle(44));
+	turnAngleQuat(calcAbsAngle(43.5));
 	pros::delay(200);
 	intakingAutoFwd();
 	drive->moveRaw(2750);
@@ -538,18 +265,18 @@ void quaternion_testing() {
 	//move up to next MG
 	turnAngleQuat(calcAbsAngle(0.5));
 	pros::delay(300);
-	drive->moveRaw(-2800);
+	drive->moveRaw(-2700);
 	pros::delay(200);
 
 	//turn to and clamp MG2
 	turnAngleQuat(calcAbsAngle(90));
-	drive->moveRaw(-900);
-	pros::delay(50);
+	drive->moveRawAsync(-1200);
+	pros::delay(1050);
 	piston.set_value(true);
 	pros::delay(100);
 
 	//turn drive straight get 2nd MG 1-4
-	turnAngleQuat(calcAbsAngle(-45));
+	turnAngleQuat(calcAbsAngle(-46.5));
 	intakingAutoFwd();
 	pros::delay(100);
 	drive->moveRaw(4850);
@@ -567,26 +294,28 @@ void quaternion_testing() {
 	drive->moveRaw(600);
 	pros::delay(100);
 
-	//move forward to MG3
-	turnAngleQuat(calcAbsAngle(0));
-	pros::delay(200);
-	drive->moveRaw(2950);
-	turnAngleQuat(-90);
-	
-
-
-
-
-
-
-
-
 	pros::delay(2000);
+}
+
+void PID_tuning() {
+	turnAngleQuat(-90);
+	pros::delay(500);
+	turnAngleQuat(179.99);
+	pros::delay(500);
+	turnAngleQuat(90);
+	pros::delay(500);
+	turnAngleQuat(45);
+	pros::delay(500);
+	turnAngleQuat(-45);
+	pros::delay(500);
+	turnAngleQuat(-179.99);
 }
 
 void autonomous() {
 	//basic_autonomous();
-	quaternion_testing();
+	if (pros::millis() > 3000) {
+		PID_tuning();
+	}
 }
 
 void opcontrol() {
@@ -627,9 +356,13 @@ void opcontrol() {
 		drive->getModel()->tank(
 				leftY,
 				rightY);
-		
 
-
+		if (controller.getDigital(ControllerDigital::A)) {
+			drive->getModel()->tank(.12, .12);
+		}
+		if (controller.getDigital(ControllerDigital::Y)) {
+			drive->getModel()->tank(.13, .13);
+		}
 		// intake/indexer
 		if(controller.getDigital(ControllerDigital::R1))
 			driveIntakingForward();
@@ -649,9 +382,9 @@ void opcontrol() {
 				toggle = !toggle;
 				latch = true;
 			}
-		}
-		else
+		} else {
 			latch = false; //once button is released then release the latch too
+		}
 
 		pros::delay(20); // Run for 20 ms then update
 	}
